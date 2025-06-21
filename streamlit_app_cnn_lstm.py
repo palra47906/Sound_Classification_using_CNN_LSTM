@@ -12,11 +12,10 @@ import requests
 import soundfile as sf
 import streamlit as st
 import tensorflow as tf
-from keras.saving import enable_unsafe_deserialization
 from tensorflow.keras.models import load_model
 
-# --- Allow loading Lambda layers ---
-enable_unsafe_deserialization()
+# # --- Allow loading Lambda layers ---
+# enable_unsafe_deserialization()
 
 # --- Streamlit Page Config ---
 st.set_page_config(page_title="Urban Sound Classifier using CNN and LSTM 🎧", layout="wide")
@@ -109,8 +108,8 @@ class_mapping = load_class_mapping()
 # --- Load Trained Model ---
 @st.cache_resource
 def load_trained_model():
-    model_url = "https://huggingface.co/palra47906/Sound_Classification_Model_using_CNN_LSTM/resolve/main/Urbansound8K_CNN_LSTM.keras"
-    model_path = "Urbansound8K_CNN_LSTM.keras"
+    model_url = "https://huggingface.co/palra47906/Sound_Classification_Model_using_CNN_LSTM/resolve/main/Urbansound8K_CNN%2BLSTM_14042025.keras"
+    model_path = "Urbansound8K_CNN+LSTM.keras"
     if not os.path.exists(model_path):
         with st.spinner("Downloading model..."):
             urllib.request.urlretrieve(model_url, model_path)
@@ -118,22 +117,32 @@ def load_trained_model():
 
 
 # --- Feature Extraction ---
+from skimage.transform import resize
+
+
 def extract_features(file, fixed_length=168):
     try:
         y, sr = librosa.load(file, sr=22050, mono=True)
         n_fft = min(2048, len(y))
-        mel_spec = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft, n_mels=168, fmax=8000)
+        mel_spec = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft, n_mels=fixed_length, fmax=8000)
         mel_db = librosa.power_to_db(mel_spec, ref=np.max)
 
+        # Pad/Trim to (168, 168)
         if mel_db.shape[1] > fixed_length:
             mel_db = mel_db[:, :fixed_length]
         else:
             mel_db = np.pad(mel_db, ((0, 0), (0, fixed_length - mel_db.shape[1])), mode='constant')
 
-        return mel_db, sr, y
+        # 🔁 Resize to 224x224 and repeat channels
+        mel_resized = resize(mel_db, (224, 224), preserve_range=True, anti_aliasing=True)
+        mel_rgb = np.stack([mel_resized] * 3, axis=-1)  # Shape: (224, 224, 3)
+
+        return mel_rgb, sr, y
     except Exception as e:
         st.error(f"Error processing audio: {e}")
         return None, None, None
+
+
 
 # --- Prediction ---
 @tf.function(reduce_retracing=True)
@@ -145,9 +154,10 @@ def predict_class(model, file):
     if features is None:
         return None, None, None, None
 
-    features = (features - np.mean(features)) / np.std(features)
-    features = np.expand_dims(features, axis=-1)
-    features = np.expand_dims(features, axis=0)
+    features = features.astype(np.float32)
+    features = (features - np.mean(features)) / (np.std(features) + 1e-8)
+    features = np.expand_dims(features, axis=0)  # Shape: (1, 224, 224, 3)
+
     input_tensor = tf.convert_to_tensor(features, dtype=tf.float32)
 
     prediction = make_prediction(model, input_tensor)
@@ -156,6 +166,7 @@ def predict_class(model, file):
     label = class_mapping.get(predicted_class, "Unknown")
 
     return label, sr, audio, features, prediction.numpy()
+
 
 # --- UI Layout ---
 st.markdown("""
