@@ -4,7 +4,7 @@ pandas
 librosa
 matplotlib
 soundfile
-tensorflow
+tensorflow==2.13.0
 requests
 pytz
 scikit-image
