@@ -1,5 +1,5 @@
 streamlit==1.34.0
-numpy==1.24.3
+numpy==1.26.4
 pandas==1.5.3
 librosa==0.10.1
 matplotlib==3.7.1
@@ -7,4 +7,4 @@ soundfile==0.12.1
 tensorflow==2.13.0
 requests==2.31.0
 pytz==2023.3.post1
-scikit-image==0.22.0
+scikit-image==0.21.0
