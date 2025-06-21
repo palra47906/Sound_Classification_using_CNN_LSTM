@@ -7,3 +7,4 @@ soundfile==0.12.1
 tensorflow==2.13.0
 requests==2.31.0
 pytz==2023.3.post1
+scikit-image==0.22.0
